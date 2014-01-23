@@ -1,8 +1,4 @@
 package cn.yixblog.security.core.beans
-
-import org.apache.commons.codec.digest.DigestUtils
-import org.apache.commons.lang.RandomStringUtils
-
 /**
  * Created by Yixian on 14-1-19.
  */
@@ -10,18 +6,21 @@ class CachedAccount {
     String id;
     String uid;
     long lastActiveTime;
-    String ipAddress;
-    String randomString = RandomStringUtils.random(20, true, true);
 
     String getSSID() {
-        return DigestUtils.md5Hex("$id##$uid##$ipAddress##$randomString");
+        return "$id###$uid###${Long.toHexString(lastActiveTime)}";
     }
 
+    static final CachedAccount parseFromSSID(String ssid) {
+        String[] values = ssid.split("###");
+        if (values.length != 3) {
+            return null;
+        }
+        return new CachedAccount(id: values[0], uid: values[1], lastActiveTime: Long.valueOf(values[2], 16))
+    }
+
+
     boolean available(int availableMinutes) {
-        Calendar currentCalendar = Calendar.getInstance();
-        Calendar lastActiveCalendar = Calendar.getInstance();
-        lastActiveCalendar.setTimeInMillis(lastActiveTime)
-        lastActiveCalendar.add(Calendar.MINUTE, availableMinutes);
-        return lastActiveCalendar.after(currentCalendar);
+        return System.currentTimeMillis() - lastActiveTime < availableMinutes * 60_000;
     }
 }

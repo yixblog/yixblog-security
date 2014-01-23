@@ -5,6 +5,8 @@ package cn.yixblog.security.core.beans
  */
 class CacheResult {
     String ssidCode;
+    String timeCode;
+    CachedAccount account;
     String msg;
     boolean success;
 }

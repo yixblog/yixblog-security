@@ -1,67 +1,45 @@
-package cn.yixblog.security.services;
+package cn.yixblog.security.services
 
-import cn.yixblog.security.core.IAccountManager;
-import cn.yixblog.security.core.beans.CacheResult;
-import cn.yixblog.security.core.beans.CachedAccount;
-import cn.yixblog.security.dao.IAccountRepository;
-import cn.yixblog.security.tools.crypts.AESCrypt;
-import cn.yixblog.security.tools.crypts.MyCrypt;
+import cn.yixblog.security.core.IAccountManager
+import cn.yixblog.security.core.beans.CacheResult
+import cn.yixblog.security.core.beans.CachedAccount
+import cn.yixblog.security.tools.PasswordPair
+import cn.yixblog.security.tools.PasswordProvider
+import cn.yixblog.security.tools.crypts.AESCrypt
+import cn.yixblog.security.tools.crypts.MyCrypt
 
 /**
  * SSID manager
  * Created by Yixian on 14-1-19.
  */
 class AccountManager implements IAccountManager {
-    IAccountRepository repository;
-    /**
-     * is one account is unique in session,default is false
-     */
-    boolean uniqueSession = false;
-    /**
-     * when uniqueSession is true and the same account logged in ,keep the previous session available and refuse the new request
-     * default is false
-     */
-    boolean keepPreviousSession = false;
-    private MyCrypt crypt;
-
-    /**
-     * set the AES password;required!
-     * @param password AES password
-     */
-    void setPassword(String password) {
-        crypt = new AESCrypt(password);
-    }
+    PasswordProvider pwdProvider;
+    int availableMinutes;
 
     @Override
-    CachedAccount getLoginAccount(String ssidCode, String ipAddress) {
-        String ssid = crypt.decrypt(ssidCode);
-        CachedAccount account = repository.queryForAccountBySSID(ssid);
-        if (ipAddress.equals(account.getIpAddress())) {
-            account.setLastActiveTime(System.currentTimeMillis());
-            repository.cacheAccount(account);
-            return account;
-        }
-        return null;
-    }
-
-    @Override
-    CacheResult saveAccount(CachedAccount account) {
-        if (uniqueSession) {
-            List<CachedAccount> oldAccounts = repository.queryForAccountByID(account.getId());
-            if (oldAccounts.size() > 0) {
-                if (keepPreviousSession) {
-                    return new CacheResult(success: false, msg: "本账户已在其他地方登陆");
-                } else {
-                    oldAccounts.each {
-                        repository.removeCache(it.getSSID())
-                    }
-                }
+    CacheResult checkAccountLegal(String ssidCode, String timeCode) {
+        String password = pwdProvider.getPassword(timeCode);
+        if (password != null) {
+            MyCrypt crypt = new AESCrypt(password);
+            String ssid = crypt.decrypt(ssidCode);
+            CachedAccount account = CachedAccount.parseFromSSID(ssid);
+            if (account != null && account.available(availableMinutes)) {
+                account.setLastActiveTime(System.currentTimeMillis());
+                return generateSSIDCode(account)
             }
         }
-        String ssid = account.getSSID();
-        account.setLastActiveTime(System.currentTimeMillis());
-        repository.cacheAccount(account);
-        return new CacheResult(success: true, ssidCode: crypt.encrypt(ssid))
+        return new CacheResult(success: false, msg: '非法请求')
     }
 
+    private CacheResult generateSSIDCode(CachedAccount account) {
+        PasswordPair newPwd = pwdProvider.getCurrentPassword();
+        MyCrypt crypt = new AESCrypt(newPwd.getPassword());
+        return new CacheResult(account: account, ssidCode: crypt.encrypt(account.getSSID()), timeCode: newPwd.getGenerateTimeHex(), success: true, msg: '校验成功');
+    }
+
+    @Override
+    CacheResult generateSSID(String id, String uid) {
+        CachedAccount account = new CachedAccount(id: id,uid: uid,lastActiveTime: System.currentTimeMillis());
+        return generateSSIDCode(account)
+    }
 }
