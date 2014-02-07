@@ -6,7 +6,7 @@
 
     <groupId>cn.yixblog</groupId>
     <artifactId>yixblog-security</artifactId>
-    <version>1.0</version>
+    <version>1.1</version>
     <packaging>jar</packaging>
 
     <properties>
@@ -19,6 +19,12 @@
             <groupId>org.codehaus.groovy</groupId>
             <artifactId>groovy-all</artifactId>
             <version>${groovy.version}</version>
+        </dependency>
+
+        <dependency>
+            <groupId>bouncycastle</groupId>
+            <artifactId>bcprov-jdk15</artifactId>
+            <version>140</version>
         </dependency>
 
         <dependency>
